@@ -5,125 +5,90 @@ using System.Linq;
 using System.Threading.Tasks;
 using Bookstore.Dtos;
 using Bookstore.Models;
+using Bookstore.Interfaces;
+using Bookstore.Repository;
+using static System.Reflection.Metadata.BlobBuilder;
+
 namespace Bookstore.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     public class BookController : ControllerBase
     {
-        private readonly BookstoreContext _context;
+        private readonly IBookRepository _bookRepository;
 
-        public BookController(BookstoreContext context)
+        public BookController(IBookRepository bookRepository)
         {
-            _context = context;
+            _bookRepository = bookRepository;
         }
 
         //GET: api/Book
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Book>>> GetBooks()
         {
-            if (_context.Books == null)
+            var books = await _bookRepository.GetAllBooksAsync();
+            if (books == null)
             {
                 return NotFound();
             }
 
 
-            return await _context.Books.Include(p => p.Author).ToListAsync();
+            return Ok(books);
         }
 
         //GET: api/Book/{id}
         [HttpGet("{id}")]
         public async Task<ActionResult<Book>> GetBook(int id)
         {
-            var book = await _context.Books.Include(p => p.Author).FirstOrDefaultAsync(x => x.Id == id);
+            var book = await _bookRepository.GetBookByIdAsync(id);
 
             if (book == null)
             {
                 return NotFound();
             }
-            return book;
-        }
-
-        // PUT: api/Books/5
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutBook(int id, BookDto bookDto)
-        {
-            var book = await _context.Books.Include(b => b.Author).FirstOrDefaultAsync(b => b.Id == id);
-            if (book == null)
-            {
-                return NotFound();
-            }
-            book.Title = bookDto.Title;
-            book.YearOfPublication = bookDto.YearOfPublication;
-
-            var author = await _context.Author.FindAsync(bookDto.AuthorId);
-            if (author == null)
-            {
-                return BadRequest("Author not found");
-            }
-            book.Author = author;
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!BookExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
+            return Ok(book);
         }
 
         // POST: api/Books
         [HttpPost]
         public async Task<ActionResult<Book>> PostBook(BookDto bookDto)
         {
-            var author = await _context.Author.FindAsync(bookDto.AuthorId);
-            if (author == null)
+            var book = await _bookRepository.InsertBookAsync(bookDto);
+            if (book == null)
             {
                 return BadRequest("Author not found");
             }
-            var book = new Book
-            {
-                Title = bookDto.Title,
-                YearOfPublication = bookDto.YearOfPublication,
-                Author = author
-            };
-
-
-            _context.Books.Add(book);
-            await _context.SaveChangesAsync();
-
 
             return CreatedAtAction(nameof(GetBook), new { id = book.Id }, book);
         }
+
+        // PUT: api/Books/5
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutBook(int id, BookDto bookDto)
+        {
+            var updatedBook = await _bookRepository.UpdateBookAsync(id, bookDto);
+            if (updatedBook == null)
+            {
+                return NotFound();
+            }
+
+            return NoContent();
+        }
+
 
         // DELETE: api/Books/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteBook(int id)
         {
 
-            var book = await _context.Books.FindAsync(id);
-            if (book == null)
+            var deleteSuccess = await _bookRepository.DeleteBookAsync(id);
+            if (!deleteSuccess)
             {
-                return NotFound();
+                return NotFound(); // Book not found
             }
 
-            _context.Books.Remove(book);
-            await _context.SaveChangesAsync();
+            return NoContent(); // Successfully deleted, return HTTP 204
+        }
 
-            return NoContent();
-        }
-        private bool BookExists(int id)
-        {
-            return _context.Books.Any(e => e.Id == id);
-        }
     }
 }

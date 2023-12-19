@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using Microsoft.EntityFrameworkCore;
 using Bookstore.Dtos;
+using Bookstore.Interfaces;
 
 namespace Bookstore.Controllers
 {
@@ -11,26 +12,31 @@ namespace Bookstore.Controllers
     [ApiController]
     public class AuthorController : ControllerBase
     {
-        private readonly BookstoreContext _context;
+        private readonly IAuthorRepository _authorRepository;
 
-        public AuthorController(BookstoreContext context)
+        public AuthorController(IAuthorRepository authorRepository)
         {
-            _context = context;
+            _authorRepository = authorRepository;
         }
 
         // GET: api/Author
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Author>>> GetAuthor()
         {
-   
-            return await _context.Author.Include(p => p.Books).ToListAsync();
+            var authors = await _authorRepository.GetAllAuthorsAsync();
+
+            if (!authors.Any())
+            {
+                return NotFound();
+            }
+            return Ok(authors);
         }
 
         //GET: api/Author/{id}
         [HttpGet("{id}")]
         public async Task<ActionResult<Author>> GetAuthor(int id)
         {
-            var author = await _context.Author.Include(p => p.Books).FirstOrDefaultAsync(x => x.AuthorId == id);
+            var author = await _authorRepository.GetAuthorByIdAsync(id);
 
             if (author == null)
             {
@@ -39,70 +45,37 @@ namespace Bookstore.Controllers
             return author;
         }
 
+        [HttpPost]
+        public async Task<ActionResult<Author>> PostAuthor(AuthorDto authorDto)
+        {
+            var author = await _authorRepository.InsertAuthorAsync(authorDto);
+
+            return CreatedAtAction(nameof(GetAuthor), new { id = author.AuthorId }, author);
+        }
+
         // PUT: api/Author/5
         [HttpPut("{id}")]
         public async Task<IActionResult> PutAuthor(int id, AuthorDto authorDto)
         {
-            var author = await _context.Author.Include(b => b.Books).FirstOrDefaultAsync(b => b.AuthorId == id);
-            if (author == null)
+            var updateAuthor = await _authorRepository.UpdateAuthorAsync(id, authorDto);
+            if (updateAuthor == null)
             {
                 return NotFound();
             }
 
-            author.Name = authorDto.Name;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!AuthorExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
             return NoContent();
-        }
-
-        [HttpPost]
-        public async Task<ActionResult<Author>> PostAuthor(AuthorDto authorDto)
-        {
-            var author = new Author
-            {
-                Name = authorDto.Name
-                // Set other properties if any
-            };
-
-            _context.Author.Add(author);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetAuthor), new { id = author.AuthorId }, author);
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAuthor(int id)
         {
-            var author = await _context.Author.FindAsync(id);
-            if (author == null)
+            var deleteSuccess = await _authorRepository.DeleteAuthorAsync(id);
+            if (!deleteSuccess)
             {
-                return NotFound();
+                return NotFound(); // Author not found
             }
 
-            _context.Author.Remove(author);
-            await _context.SaveChangesAsync();
-
             return NoContent();
-        }
-
-        private bool AuthorExists(int id)
-        {
-            return _context.Author.Any(e => e.AuthorId == id);
         }
 
     }
