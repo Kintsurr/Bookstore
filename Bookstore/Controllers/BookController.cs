@@ -8,6 +8,7 @@ using Bookstore.Models;
 using Bookstore.Interfaces;
 using Bookstore.Repository;
 using static System.Reflection.Metadata.BlobBuilder;
+using System.Xml.Linq;
 
 namespace Bookstore.Controllers
 {
@@ -24,9 +25,37 @@ namespace Bookstore.Controllers
 
         //GET: api/Book
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Book>>> GetBooks()
+        public async Task<ActionResult<IEnumerable<Book>>> GetBooks(string? title = null, string? sortBy = null, int page = 1, int pageSize = 10)
         {
             var books = await _bookRepository.GetAllBooksAsync();
+
+            if (string.IsNullOrEmpty(title) == false)
+            {
+                books = books.Where(a => a.Title.Contains(title));
+            }
+
+            if (string.IsNullOrEmpty(sortBy) == false)
+            {
+                switch (sortBy.ToLower())
+                {
+                    case "title":
+                        books = books.OrderBy(a => a.Title);
+                        break;
+                    case "id":
+                        books = books.OrderBy(a => a.Id);
+                        break;
+                    default:
+                        books = books.OrderBy(a => a.Title); // Default sorting if unrecognized field
+                        break;
+                }
+            }
+            else
+            {
+                books = books.OrderBy(a => a.Title);
+            }
+
+            var pagedBooks = books.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
             if (books == null)
             {
                 return NotFound();

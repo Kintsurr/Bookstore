@@ -21,9 +21,38 @@ namespace Bookstore.Controllers
 
         // GET: api/Author
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Author>>> GetAuthor()
+        public async Task<ActionResult<IEnumerable<Author>>> GetAuthor(string? name = null, string? sortBy = null, int page = 1, int pageSize = 10)
         {
             var authors = await _authorRepository.GetAllAuthorsAsync();
+
+            // Filtering
+            if (string.IsNullOrEmpty(name) == false)
+            {
+                authors = authors.Where(a => a.Name.Contains(name));
+            }
+
+            // Sorting
+            if (string.IsNullOrEmpty(sortBy) == false)
+            {
+                switch (sortBy.ToLower())
+                {
+                    case "name":
+                        authors = authors.OrderBy(a => a.Name);
+                        break;
+                    case "id":
+                        authors = authors.OrderBy(a => a.AuthorId);
+                        break; 
+                    default:
+                        authors = authors.OrderBy(a => a.Name);
+                        break;
+                }
+            }
+            else
+            {
+                authors = authors.OrderBy(a => a.Name);
+            }
+
+            var pagedAuthors = authors.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
             if (!authors.Any())
             {
